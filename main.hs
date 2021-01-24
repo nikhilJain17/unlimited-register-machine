@@ -30,25 +30,35 @@ loadConsecutiveRegisters registerVals startIndex = (take startIndex memory) ++ r
 someMemory :: Memory
 someMemory = loadConsecutiveRegisters [1..10] 0
 
--- | Execute a program, printing the contents of memory out at each step.
-execute :: Program -> ProgramCounter -> Memory -> IO Memory
-execute = undefined
+someProgram :: Program
+someProgram = [(Successor 1), (Successor 1), (Successor 1), (Successor 2), (Successor 2), (Successor 2), (Successor 3)]
 
--- | Execute a single instruction purely. Note that although we use the Either monad, it
--- | doesn't signify an error here, but is just used for convenience while returning a value.
-executeInstruction :: Instruction -> ProgramState -> ProgramState
-executeInstruction (Zero r) (pc, mem) = (pc + 1, x ++ [0] ++ xs)
+-- | Execute a program, printing the contents of memory out at each step.
+execute :: Program -> ProgramState -> IO ()
+execute program (pc, mem) 
+    | pc >= length program = putStrLn $ printMem mem
+    | otherwise = 
+        do
+            (newPc, newMem) <- executeInstruction (program!!pc) (pc, mem)
+            putStrLn $ printMem newMem
+            execute program (newPc, newMem)
+    where
+        printMem m = show $ take 10 m
+
+-- | Execute a single instruction purely.
+executeInstruction :: Instruction -> ProgramState -> IO ProgramState
+executeInstruction (Zero r) (pc, mem) = return (pc + 1, x ++ [0] ++ xs)
     where
         (x, _:xs) = splitAt r mem
-executeInstruction (Successor r) (pc, mem) = (pc + 1, x ++ [y + 1] ++ ys)
+executeInstruction (Successor r) (pc, mem) = return (pc + 1, x ++ [y + 1] ++ ys)
     where
         (x, y:ys) = splitAt r mem
-executeInstruction (Transfer r1 r2) (pc, mem) = (pc + 1, x ++ [mem!!r1] ++ y)
+executeInstruction (Transfer r1 r2) (pc, mem) = return (pc + 1, x ++ [mem!!r1] ++ y)
     where
         (x, y) = splitAt r2 mem
 executeInstruction (Jump r1 r2 jumpPc) (pc, mem) 
-    | mem!!r1 == mem!!r2 = (jumpPc, transferredMem)
-    | otherwise = (pc + 1, mem)
+    | mem!!r1 == mem!!r2 = return (jumpPc, transferredMem)
+    | otherwise = return (pc + 1, mem)
     where
         transferredMem = x ++ [mem!!r1] ++ ys
         (x, _:ys) = splitAt r2 mem
@@ -56,4 +66,4 @@ executeInstruction (Jump r1 r2 jumpPc) (pc, mem)
 
 -- @todo getChar, 's' is for step, 'r' is for run through
 main :: IO ()
-main = putStrLn $ show (Zero 1)
+main = execute someProgram (0, memory)
